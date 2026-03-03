@@ -137,20 +137,34 @@ const MapManager = {
 
   /* ── Markers ─────────────────────────────────────── */
 
-  setStartMarker(latlng, label) {
+  setStartMarker(latlng, label, onDragEnd) {
     if (this._markerStart) this.map.removeLayer(this._markerStart);
     this._markerStart = L.marker(latlng, {
-      title: label,
-      icon:  this._icon('🟢')
+      title:     label,
+      icon:      this._icon('🟢'),
+      draggable: true
     }).addTo(this.map);
+    if (onDragEnd) {
+      this._markerStart.on('dragend', e => {
+        const pos = e.target.getLatLng();
+        onDragEnd({ lat: pos.lat, lng: pos.lng });
+      });
+    }
   },
 
-  setEndMarker(latlng, label) {
+  setEndMarker(latlng, label, onDragEnd) {
     if (this._markerEnd) this.map.removeLayer(this._markerEnd);
     this._markerEnd = L.marker(latlng, {
-      title: label,
-      icon:  this._icon('🔴')
+      title:     label,
+      icon:      this._icon('🔴'),
+      draggable: true
     }).addTo(this.map);
+    if (onDragEnd) {
+      this._markerEnd.on('dragend', e => {
+        const pos = e.target.getLatLng();
+        onDragEnd({ lat: pos.lat, lng: pos.lng });
+      });
+    }
   },
 
   clearMarkers() {

@@ -3,8 +3,9 @@
  * Falls back to Nominatim if the geo.admin server is unavailable.
  */
 const Geocoding = {
-  GEO_ADMIN_URL: 'https://api3.geo.admin.ch/rest/services/api/SearchServer',
-  NOMINATIM_URL: 'https://nominatim.openstreetmap.org/search',
+  GEO_ADMIN_URL:         'https://api3.geo.admin.ch/rest/services/api/SearchServer',
+  NOMINATIM_URL:         'https://nominatim.openstreetmap.org/search',
+  NOMINATIM_REVERSE_URL: 'https://nominatim.openstreetmap.org/reverse',
 
   /**
    * Search for locations matching the given text.
@@ -64,5 +65,27 @@ const Geocoding = {
       lng:   parseFloat(r.lon),
       label: r.display_name
     }));
+  },
+
+  /**
+   * Reverse-geocode a lat/lng to a human-readable label.
+   * Returns a string label, or null if unavailable.
+   * @param {number} lat
+   * @param {number} lng
+   * @returns {Promise<string|null>}
+   */
+  async reverseGeocode(lat, lng) {
+    const url = `${this.NOMINATIM_REVERSE_URL}?lat=${lat}&lon=${lng}&format=json&accept-language=en`;
+    try {
+      const res = await fetch(url, {
+        headers: { 'User-Agent': 'SwissCyclingRoutePlanner/1.0 (https://github.com/lkuebler/swiss-cycling-aber-easy)' },
+        signal:  AbortSignal.timeout(5000)
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data.display_name || null;
+    } catch (_) {
+      return null;
+    }
   }
 };
