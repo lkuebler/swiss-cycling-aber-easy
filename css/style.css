@@ -1,0 +1,553 @@
+/* =====================================================
+   Swiss Cycling Route Planner – stylesheet
+   ===================================================== */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --red:       #e63946;
+  --red-dark:  #c1121f;
+  --dark:      #2b2d42;
+  --mid:       #6c757d;
+  --light:     #f8f9fa;
+  --border:    #dee2e6;
+  --sidebar-w: 340px;
+  --results-w: 330px;
+  --radius:    8px;
+  --shadow:    0 2px 12px rgba(0,0,0,.12);
+}
+
+html, body {
+  height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 14px;
+  color: var(--dark);
+}
+
+/* ── Layout ─────────────────────────────────────────── */
+
+body {
+  display: flex;
+  overflow: hidden;
+}
+
+#map {
+  flex: 1;
+  height: 100vh;
+  z-index: 0;
+}
+
+/* ── Sidebar ─────────────────────────────────────────── */
+
+#sidebar {
+  width: var(--sidebar-w);
+  min-width: var(--sidebar-w);
+  height: 100vh;
+  overflow-y: auto;
+  background: #fff;
+  box-shadow: var(--shadow);
+  z-index: 800;
+  display: flex;
+  flex-direction: column;
+  transition: transform .25s ease;
+}
+
+#sidebar.collapsed {
+  transform: translateX(-100%);
+  position: absolute;
+}
+
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  background: var(--red);
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.sidebar-header .logo {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.sidebar-header h1 {
+  flex: 1;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+#sidebar-toggle {
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 4px;
+  line-height: 1;
+  transition: background .15s;
+}
+
+#sidebar-toggle:hover { background: rgba(255,255,255,.25); }
+
+#sidebar-open {
+  display: none;
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 900;
+  background: var(--red);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  padding: 8px 12px;
+  font-size: 1.1rem;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+}
+
+/* ── Panel sections ───────────────────────────────────── */
+
+.panel-section {
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.section-title {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: .7px;
+  color: var(--mid);
+  margin-bottom: 10px;
+  font-weight: 600;
+}
+
+/* ── Base map cards ───────────────────────────────────── */
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.map-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: var(--radius);
+  border: 2px solid transparent;
+  transition: border-color .15s, background .15s;
+  user-select: none;
+}
+
+.map-card img {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 5px;
+  object-fit: cover;
+  background: var(--light);
+}
+
+.map-card span {
+  font-size: 0.7rem;
+  text-align: center;
+  color: var(--dark);
+  line-height: 1.2;
+}
+
+.map-card:hover     { background: var(--light); }
+.map-card.active    { border-color: var(--red); background: #fff1f2; }
+
+/* ── Cycling overlay toggles ─────────────────────────── */
+
+.overlay-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.overlay-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 5px 0;
+  font-size: 0.875rem;
+}
+
+.overlay-item input[type="checkbox"] {
+  cursor: pointer;
+  width: 15px;
+  height: 15px;
+  accent-color: var(--red);
+}
+
+.overlay-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ── Mode tabs ───────────────────────────────────────── */
+
+.mode-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 14px;
+  background: var(--light);
+  border-radius: var(--radius);
+  padding: 4px;
+}
+
+.mode-tab {
+  flex: 1;
+  padding: 7px 4px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--mid);
+  transition: background .15s, color .15s;
+}
+
+.mode-tab.active {
+  background: #fff;
+  color: var(--red);
+  box-shadow: 0 1px 4px rgba(0,0,0,.08);
+}
+
+.mode-panel { display: none; }
+.mode-panel.active { display: block; }
+
+/* ── Inputs ──────────────────────────────────────────── */
+
+.input-group {
+  margin-bottom: 12px;
+}
+
+.input-group label {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--mid);
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+
+.autocomplete-wrap {
+  position: relative;
+}
+
+.autocomplete-wrap input[type="text"] {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 0.875rem;
+  outline: none;
+  transition: border-color .15s;
+}
+
+.autocomplete-wrap input[type="text"]:focus {
+  border-color: var(--red);
+}
+
+.suggestions {
+  display: none;
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 0;
+  right: 0;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  z-index: 9999;
+  max-height: 210px;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.suggestions.open { display: block; }
+
+.suggestion-item {
+  padding: 9px 12px;
+  cursor: pointer;
+  font-size: 0.82rem;
+  border-bottom: 1px solid #f5f5f5;
+  transition: background .1s;
+}
+
+.suggestion-item:last-child { border-bottom: none; }
+.suggestion-item:hover { background: var(--light); }
+
+input[type="range"] {
+  width: 100%;
+  margin-top: 6px;
+  accent-color: var(--red);
+}
+
+.range-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.7rem;
+  color: var(--mid);
+  margin-top: 2px;
+}
+
+.btn-primary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 10px;
+  background: var(--red);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 4px;
+  transition: background .15s;
+}
+
+.btn-primary:hover    { background: var(--red-dark); }
+.btn-primary:disabled { background: #ccc; cursor: not-allowed; }
+
+/* ── Saved routes ────────────────────────────────────── */
+
+.empty-hint {
+  color: var(--mid);
+  font-size: 0.82rem;
+  padding: 4px 0;
+}
+
+.saved-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.82rem;
+}
+
+.saved-item:last-child { border-bottom: none; }
+
+.saved-item .saved-name {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 500;
+}
+
+.saved-item .saved-dist {
+  color: var(--mid);
+  white-space: nowrap;
+}
+
+.saved-item .icon-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 2px 3px;
+  border-radius: 4px;
+  transition: background .1s;
+}
+
+.saved-item .icon-btn:hover { background: var(--light); }
+
+/* ── Results panel ───────────────────────────────────── */
+
+#results-panel {
+  position: fixed;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: var(--results-w);
+  background: #fff;
+  box-shadow: -2px 0 12px rgba(0,0,0,.12);
+  z-index: 800;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+#results-panel[hidden] { display: none !important; }
+
+.results-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  background: var(--dark);
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.results-header h2 {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+#results-close {
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background .15s;
+}
+
+#results-close:hover { background: rgba(255,255,255,.2); }
+
+#results-list {
+  overflow-y: auto;
+  flex: 1;
+  padding: 12px;
+}
+
+/* ── Route card ──────────────────────────────────────── */
+
+.route-card {
+  background: var(--light);
+  border: 2px solid transparent;
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  cursor: pointer;
+  transition: border-color .15s, box-shadow .15s;
+}
+
+.route-card:hover,
+.route-card.highlighted {
+  border-color: var(--red);
+  box-shadow: 0 2px 10px rgba(230,57,70,.15);
+}
+
+.route-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.route-color-dot {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.route-card h3 {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--dark);
+}
+
+.route-stats {
+  display: flex;
+  gap: 14px;
+  font-size: 0.82rem;
+  color: var(--mid);
+  margin-bottom: 10px;
+}
+
+.route-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.btn-sm {
+  flex: 1;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+  font-size: 0.78rem;
+  cursor: pointer;
+  text-align: center;
+  transition: background .12s;
+  white-space: nowrap;
+}
+
+.btn-sm:hover { background: var(--light); }
+
+/* ── Loading overlay ─────────────────────────────────── */
+
+#loading {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.5);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  gap: 14px;
+}
+
+#loading[hidden] { display: none !important; }
+
+.spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid rgba(255,255,255,.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin .8s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Mobile responsive ───────────────────────────────── */
+
+@media (max-width: 768px) {
+  body { flex-direction: column-reverse; }
+
+  #sidebar {
+    width: 100%;
+    min-width: 0;
+    height: 50vh;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 900;
+    transform: translateY(0);
+    transition: transform .25s ease;
+  }
+
+  #sidebar.collapsed {
+    transform: translateY(100%);
+  }
+
+  #sidebar-open { display: block; }
+
+  #map { height: 100vh; }
+
+  #results-panel {
+    width: 100%;
+    top: auto;
+    height: 55vh;
+  }
+
+  .card-grid { grid-template-columns: repeat(4, 1fr); }
+}
