@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Swiss Cycling – Route Planner</title>
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <!-- App styles -->
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+  <!-- ===== SIDEBAR ===== -->
+  <aside id="sidebar">
+    <div class="sidebar-header">
+      <span class="logo">🚴</span>
+      <h1>Swiss Cycling</h1>
+      <button id="sidebar-toggle" aria-label="Toggle sidebar">✕</button>
+    </div>
+
+    <!-- Base map cards -->
+    <section class="panel-section">
+      <h2 class="section-title">Base Map</h2>
+      <div class="card-grid">
+        <label class="map-card active" data-layer="color">
+          <input type="radio" name="base-layer" value="color" checked hidden />
+          <img src="https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.pixelkarte-farbe/default/current/3857/8/133/91.jpeg"
+               alt="Swiss Map Color" loading="lazy" onerror="this.style.display='none'" />
+          <span>Swiss Map</span>
+        </label>
+        <label class="map-card" data-layer="grey">
+          <input type="radio" name="base-layer" value="grey" hidden />
+          <img src="https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.pixelkarte-grau/default/current/3857/8/133/91.jpeg"
+               alt="Swiss Map Grey" loading="lazy" onerror="this.style.display='none'" />
+          <span>Grey</span>
+        </label>
+        <label class="map-card" data-layer="aerial">
+          <input type="radio" name="base-layer" value="aerial" hidden />
+          <img src="https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.swissimage/default/current/3857/8/133/91.jpeg"
+               alt="Aerial Imagery" loading="lazy" onerror="this.style.display='none'" />
+          <span>Satellite</span>
+        </label>
+        <label class="map-card" data-layer="topo25k">
+          <input type="radio" name="base-layer" value="lk25" hidden />
+          <img src="https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.pixelkarte-farbe/default/current/3857/8/133/91.jpeg"
+               alt="Topo 1:25000" loading="lazy" onerror="this.style.display='none'" />
+          <span>Topo 1:25k</span>
+        </label>
+      </div>
+    </section>
+
+    <!-- Cycling overlays -->
+    <section class="panel-section">
+      <h2 class="section-title">Cycling Routes</h2>
+      <div class="overlay-list">
+        <label class="overlay-item">
+          <input type="checkbox" id="overlay-veloland" checked />
+          <span class="overlay-dot" style="background:#e63946"></span>
+          National Cycling Routes
+        </label>
+        <label class="overlay-item">
+          <input type="checkbox" id="overlay-mountainbike" />
+          <span class="overlay-dot" style="background:#8B4513"></span>
+          Mountain Bike Routes
+        </label>
+        <label class="overlay-item">
+          <input type="checkbox" id="overlay-wanderland" />
+          <span class="overlay-dot" style="background:#2d6a4f"></span>
+          Hiking Routes
+        </label>
+      </div>
+    </section>
+
+    <!-- Route planning -->
+    <section class="panel-section">
+      <h2 class="section-title">Plan a Route</h2>
+
+      <div class="mode-tabs">
+        <button class="mode-tab active" data-mode="a-to-b">A → B</button>
+        <button class="mode-tab" data-mode="roundtrip">Roundtrip</button>
+      </div>
+
+      <!-- A → B inputs -->
+      <div id="a-to-b-inputs" class="mode-panel active">
+        <div class="input-group">
+          <label for="start-input">Start</label>
+          <div class="autocomplete-wrap">
+            <input type="text" id="start-input" placeholder="Search location…" autocomplete="off" />
+            <ul class="suggestions" id="start-suggestions"></ul>
+          </div>
+        </div>
+        <div class="input-group">
+          <label for="end-input">End</label>
+          <div class="autocomplete-wrap">
+            <input type="text" id="end-input" placeholder="Search location…" autocomplete="off" />
+            <ul class="suggestions" id="end-suggestions"></ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Roundtrip inputs -->
+      <div id="roundtrip-inputs" class="mode-panel">
+        <div class="input-group">
+          <label for="roundtrip-start-input">Start</label>
+          <div class="autocomplete-wrap">
+            <input type="text" id="roundtrip-start-input" placeholder="Search location…" autocomplete="off" />
+            <ul class="suggestions" id="roundtrip-start-suggestions"></ul>
+          </div>
+        </div>
+        <div class="input-group">
+          <label for="distance-slider">Target Distance: <strong id="distance-value">50</strong> km</label>
+          <input type="range" id="distance-slider" min="10" max="200" value="50" step="5" />
+          <div class="range-labels"><span>10 km</span><span>200 km</span></div>
+        </div>
+      </div>
+
+      <button id="find-routes-btn" class="btn-primary">
+        <span>🔍</span> Find Routes
+      </button>
+    </section>
+
+    <!-- Saved routes -->
+    <section class="panel-section" id="saved-section">
+      <h2 class="section-title">Saved Routes</h2>
+      <div id="saved-routes-list">
+        <p class="empty-hint">No saved routes yet.</p>
+      </div>
+    </section>
+  </aside>
+
+  <!-- ===== OPEN SIDEBAR BUTTON (shown when sidebar is collapsed) ===== -->
+  <button id="sidebar-open" aria-label="Open menu">☰</button>
+
+  <!-- ===== MAP ===== -->
+  <div id="map"></div>
+
+  <!-- ===== RESULTS PANEL ===== -->
+  <div id="results-panel" hidden>
+    <div class="results-header">
+      <h2>Route Proposals</h2>
+      <button id="results-close" aria-label="Close results">✕</button>
+    </div>
+    <div id="results-list"></div>
+  </div>
+
+  <!-- ===== LOADING ===== -->
+  <div id="loading" hidden>
+    <div class="spinner"></div>
+    <p>Finding routes…</p>
+  </div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- App scripts (order matters) -->
+  <script src="js/gpx.js"></script>
+  <script src="js/geocoding.js"></script>
+  <script src="js/routing.js"></script>
+  <script src="js/map.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
