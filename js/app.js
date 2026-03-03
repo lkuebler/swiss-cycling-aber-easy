@@ -75,15 +75,27 @@ const App = {
     /* Autocomplete inputs */
     this._setupAutocomplete('start-input',          'start-suggestions',          loc => {
       this._start = loc;
-      MapManager.setStartMarker([loc.lat, loc.lng], 'Start: ' + loc.label);
+      MapManager.setStartMarker([loc.lat, loc.lng], 'Start: ' + loc.label, async ({ lat, lng }) => {
+        const label = await Geocoding.reverseGeocode(lat, lng);
+        this._start = { lat, lng, label: label || `${lat.toFixed(5)}, ${lng.toFixed(5)}` };
+        document.getElementById('start-input').value = this._start.label;
+      });
     });
     this._setupAutocomplete('end-input',            'end-suggestions',            loc => {
       this._end = loc;
-      MapManager.setEndMarker([loc.lat, loc.lng], 'End: ' + loc.label);
+      MapManager.setEndMarker([loc.lat, loc.lng], 'End: ' + loc.label, async ({ lat, lng }) => {
+        const label = await Geocoding.reverseGeocode(lat, lng);
+        this._end = { lat, lng, label: label || `${lat.toFixed(5)}, ${lng.toFixed(5)}` };
+        document.getElementById('end-input').value = this._end.label;
+      });
     });
     this._setupAutocomplete('roundtrip-start-input','roundtrip-start-suggestions',loc => {
       this._start = loc;
-      MapManager.setStartMarker([loc.lat, loc.lng], 'Start: ' + loc.label);
+      MapManager.setStartMarker([loc.lat, loc.lng], 'Start: ' + loc.label, async ({ lat, lng }) => {
+        const label = await Geocoding.reverseGeocode(lat, lng);
+        this._start = { lat, lng, label: label || `${lat.toFixed(5)}, ${lng.toFixed(5)}` };
+        document.getElementById('roundtrip-start-input').value = this._start.label;
+      });
     });
 
     /* Find routes */
