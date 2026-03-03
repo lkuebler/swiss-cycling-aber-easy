@@ -1,9 +1,13 @@
 /**
- * routing.js – Route finding via OSRM public bicycle API.
+ * routing.js – Route finding via Valhalla (valhalla1.openstreetmap.de).
  *
- * A → B mode : requests up to 3 alternative routes from OSRM.
+ * Uses the bicycle costing profile with use_roads: 0.2 so that the
+ * router strongly prefers dedicated cycle ways and paths (~80% of the
+ * route will follow cycling infrastructure rather than regular roads).
+ *
+ * A → B mode : requests up to 3 alternative routes (primary + 2 alternates).
  * Roundtrip  : generates 3–5 triangular loops in different compass
- *              directions and routes each one through OSRM.
+ *              directions and routes each one through Valhalla.
  *
  * All returned route objects share the same schema:
  * {
@@ -15,7 +19,49 @@
  * }
  */
 const Routing = {
-  OSRM: 'https://router.project-osrm.org',
+  VALHALLA: 'https://valhalla1.openstreetmap.de',
+
+  /**
+   * Bicycle costing options passed to every Valhalla request.
+   * use_roads: 0–1 where 0 = strongly prefer dedicated cycle ways/paths.
+   * Setting 0.2 keeps the router on cycle infrastructure ~80% of the time.
+   */
+  CYCLING_COSTING: {
+    use_roads:    0.2,
+    bicycle_type: 'hybrid',
+    use_hills:    0.3
+  },
+
+  /**
+   * Decode a Valhalla / Google encoded polyline (precision 6) into
+   * a GeoJSON-style coordinate array [[lon, lat], …].
+   */
+  _decodePolyline6(encoded) {
+    const coords = [];
+    let index = 0, lat = 0, lng = 0;
+    while (index < encoded.length) {
+      let b, shift = 0, result = 0;
+      do { b = encoded.charCodeAt(index++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
+      lat += (result & 1) ? ~(result >> 1) : (result >> 1);
+      shift = 0; result = 0;
+      do { b = encoded.charCodeAt(index++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
+      lng += (result & 1) ? ~(result >> 1) : (result >> 1);
+      coords.push([lng / 1e6, lat / 1e6]);
+    }
+    return coords;
+  },
+
+  /** Merge all leg shapes of a Valhalla trip into a single GeoJSON LineString. */
+  _tripToGeoJSON(trip) {
+    const allCoords = [];
+    for (const leg of trip.legs) {
+      const coords = this._decodePolyline6(leg.shape);
+      // Remove duplicate point at leg junction (Valhalla includes end of previous leg as start of next)
+      if (allCoords.length > 0) coords.shift();
+      allCoords.push(...coords);
+    }
+    return { type: 'LineString', coordinates: allCoords };
+  },
 
   /**
    * Main entry point.
@@ -34,23 +80,36 @@ const Routing = {
   /* ── A → B ───────────────────────────────────────── */
 
   async _aToBRoutes(start, end) {
-    const coord = `${start.lng},${start.lat};${end.lng},${end.lat}`;
-    const url   = `${this.OSRM}/route/v1/bicycle/${coord}`
-                + `?alternatives=3&geometries=geojson&overview=full`;
+    const body = {
+      locations: [
+        { lon: start.lng, lat: start.lat },
+        { lon: end.lng,   lat: end.lat   }
+      ],
+      costing:         'bicycle',
+      costing_options: { bicycle: this.CYCLING_COSTING },
+      alternates:      2
+    };
 
-    const res  = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    const res  = await fetch(`${this.VALHALLA}/route`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(body),
+      signal:  AbortSignal.timeout(15000)
+    });
+
+    if (!res.ok) throw new Error('No routes found between these locations.');
     const data = await res.json();
+    if (!data.trip) throw new Error('No routes found between these locations.');
 
-    if (data.code !== 'Ok' || !data.routes.length) {
-      throw new Error('No routes found between these locations.');
-    }
+    const alternateTrips = (data.alternates || []).map(a => a.trip);
+    const trips = [data.trip, ...alternateTrips];
 
-    return data.routes.map((r, i) => ({
+    return trips.map((trip, i) => ({
       id:       i + 1,
       name:     i === 0 ? 'Recommended Route' : `Alternative ${i}`,
-      geometry: r.geometry,
-      distance: r.distance / 1000,
-      duration: r.duration / 60
+      geometry: this._tripToGeoJSON(trip),
+      distance: trip.summary.length,        // Valhalla returns km
+      duration: trip.summary.time / 60      // Valhalla returns seconds
     }));
   },
 
@@ -90,22 +149,27 @@ const Routing = {
     const wp1 = this._offset(start, radiusMetres, bearingOffset);
     const wp2 = this._offset(start, radiusMetres, bearingOffset + 120);
 
-    const points = [start, wp1, wp2, start]
-      .map(p => `${p.lng},${p.lat}`)
-      .join(';');
+    const body = {
+      locations: [start, wp1, wp2, start].map(p => ({ lon: p.lng, lat: p.lat })),
+      costing:         'bicycle',
+      costing_options: { bicycle: this.CYCLING_COSTING }
+    };
 
-    const url  = `${this.OSRM}/route/v1/bicycle/${points}`
-               + `?geometries=geojson&overview=full`;
-    const res  = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    const res  = await fetch(`${this.VALHALLA}/route`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(body),
+      signal:  AbortSignal.timeout(15000)
+    });
+
+    if (!res.ok) return null;
     const data = await res.json();
+    if (!data.trip) return null;
 
-    if (data.code !== 'Ok' || !data.routes.length) return null;
-
-    const r = data.routes[0];
     return {
-      geometry: r.geometry,
-      distance: r.distance / 1000,
-      duration: r.duration / 60
+      geometry: this._tripToGeoJSON(data.trip),
+      distance: data.trip.summary.length,
+      duration: data.trip.summary.time / 60
     };
   },
 
