@@ -166,7 +166,7 @@ const App = {
 
     try {
       const distance = parseInt(document.getElementById('distance-slider').value, 10);
-      const cyclingWeight = parseFloat(document.getElementById('cycling-weight').value);
+      const cyclingWeight = parseFloat(document.getElementById('cycling-way-importance').value);
       const routes = await Routing.findRoutes(this._mode, this._start, this._end, distance, cyclingWeight);
       this._currentRoutes = routes;
       MapManager.displayRoutes(routes);
