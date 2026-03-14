@@ -21,6 +21,11 @@ const Routing = {
   VALHALLA: 'https://valhalla1.openstreetmap.de',
   DEFAULT_USE_ROADS: 0.2,
   ALTERNATE_ROUTE_COUNT: 2,
+  // Per checked cycling overlay, reduce use_roads so routing prefers cycling infrastructure more strongly.
+  ROUTE_TYPE_ADJUSTMENT_FACTOR: 0.05,
+  // If no cycling overlay is selected, allow broader road usage to keep route finding flexible.
+  NO_ROUTE_TYPE_ROAD_BOOST: 0.15,
+  MAX_ROADS_WITHOUT_PUBLIC_STREETS: 0.02,
 
   /**
    * Default bicycle costing options passed to every Valhalla request.
@@ -38,20 +43,28 @@ const Routing = {
       preferHiking = false,
       allowPublicStreets = true
     } = routePreferences;
-    const checkedRouteCount = [preferVeloland, preferMountainBike, preferHiking].filter(Boolean).length;
+    const checkedCyclingRouteCount = [preferVeloland, preferMountainBike, preferHiking].filter(Boolean).length;
 
-    let adjustedUseRoads = Math.max(0, Math.min(1, Number.isFinite(useRoads) ? useRoads : this.DEFAULT_USE_ROADS));
-    if (checkedRouteCount > 0) {
-      adjustedUseRoads = Math.max(0, adjustedUseRoads - (0.05 * checkedRouteCount));
+    const baseUseRoads = Number.isFinite(useRoads) ? useRoads : this.DEFAULT_USE_ROADS;
+    let adjustedUseRoads = baseUseRoads;
+    // Checked cycling overlays should bias toward dedicated cycling infrastructure
+    // (lower use_roads). If no cycling overlay is checked, allow more road use.
+    if (checkedCyclingRouteCount > 0) {
+      adjustedUseRoads -= this.ROUTE_TYPE_ADJUSTMENT_FACTOR * checkedCyclingRouteCount;
     } else {
-      adjustedUseRoads = Math.min(1, adjustedUseRoads + 0.15);
+      adjustedUseRoads += this.NO_ROUTE_TYPE_ROAD_BOOST;
     }
     if (!allowPublicStreets) {
-      adjustedUseRoads = Math.min(adjustedUseRoads, 0.02);
+      adjustedUseRoads = Math.min(adjustedUseRoads, this.MAX_ROADS_WITHOUT_PUBLIC_STREETS);
     }
+    adjustedUseRoads = Math.max(0, Math.min(1, adjustedUseRoads));
 
+    // If only National Cycling Routes (Veloland) is checked, keep the default hybrid profile.
+    // Terrain-specific overlays tune the bike type.
+    // If both are enabled, mountainbike takes priority over hiking for bike-type selection.
     let bicycleType = 'hybrid';
     if (preferMountainBike) bicycleType = 'mountain';
+    // Valhalla's "cross" type is the closest fit for mixed-surface links common near hiking networks.
     else if (preferHiking) bicycleType = 'cross';
 
     return {

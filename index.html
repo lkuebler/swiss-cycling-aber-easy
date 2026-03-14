@@ -78,8 +78,9 @@
         </label>
       </div>
       <p class="planning-note">
-        Route planning uses the checked route types above: checked cycling networks are preferred, and
-        public streets are added when enabled.
+        Route planning uses the checked route types above: each checked cycling network increases routing
+        preference for cycling-friendly ways, while Public Streets allows regular roads as fallback
+        connections (uncheck it to keep road usage as low as possible).
       </p>
     </section>
 
@@ -134,8 +135,9 @@
         </select>
       </div>
       <p class="planning-note">
-        Route determination combines your cycling-way importance with the checked route types (National,
-        Mountain Bike, Hiking, and Public Streets).
+        Cycling Way Importance sets the base weighting, then the checked route types refine it (National,
+        Mountain Bike, Hiking, and Public Streets): higher importance plus checked cycling networks means
+        stronger cycling-way preference, with roads included only when Public Streets is enabled.
       </p>
 
       <button id="find-routes-btn" class="btn-primary">
