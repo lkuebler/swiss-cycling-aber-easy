@@ -263,6 +263,21 @@ body {
   border-color: var(--red);
 }
 
+select {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 0.875rem;
+  background: #fff;
+  color: var(--dark);
+  outline: none;
+}
+
+select:focus {
+  border-color: var(--red);
+}
+
 .suggestions {
   display: none;
   position: absolute;
