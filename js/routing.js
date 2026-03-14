@@ -1,9 +1,8 @@
 /**
  * routing.js – Route finding via Valhalla (valhalla1.openstreetmap.de).
  *
- * Uses the bicycle costing profile with use_roads: 0.2 so that the
- * router strongly prefers dedicated cycle ways and paths (~80% of the
- * route will follow cycling infrastructure rather than regular roads).
+ * Uses the bicycle costing profile with configurable use_roads so users
+ * can tune how strongly routes should prefer dedicated cycle ways/paths.
  *
  * A → B mode : requests up to 3 alternative routes (primary + 2 alternates).
  * Roundtrip  : generates 3–5 triangular loops in different compass
@@ -22,14 +21,19 @@ const Routing = {
   VALHALLA: 'https://valhalla1.openstreetmap.de',
 
   /**
-   * Bicycle costing options passed to every Valhalla request.
+   * Default bicycle costing options passed to every Valhalla request.
    * use_roads: 0–1 where 0 = strongly prefer dedicated cycle ways/paths.
-   * Setting 0.2 keeps the router on cycle infrastructure ~80% of the time.
    */
-  CYCLING_COSTING: {
-    use_roads:    0.2,
+  CYCLING_COSTING_BASE: {
     bicycle_type: 'hybrid',
     use_hills:    0.3
+  },
+
+  _buildCyclingCosting(useRoadsWeight = 0.2) {
+    return {
+      ...this.CYCLING_COSTING_BASE,
+      use_roads: Math.max(0, Math.min(1, Number.isFinite(useRoadsWeight) ? useRoadsWeight : 0.2))
+    };
   },
 
   /**
@@ -70,23 +74,23 @@ const Routing = {
    * @param {{lat:number,lng:number}|null} end
    * @param {number} [targetDistanceKm] – used for roundtrip
    */
-  async findRoutes(mode, start, end, targetDistanceKm = 50) {
+  async findRoutes(mode, start, end, targetDistanceKm = 50, useRoadsWeight = 0.2) {
     if (mode === 'a-to-b') {
-      return this._aToBRoutes(start, end);
+      return this._aToBRoutes(start, end, useRoadsWeight);
     }
-    return this._roundtripRoutes(start, targetDistanceKm);
+    return this._roundtripRoutes(start, targetDistanceKm, useRoadsWeight);
   },
 
   /* ── A → B ───────────────────────────────────────── */
 
-  async _aToBRoutes(start, end) {
+  async _aToBRoutes(start, end, useRoadsWeight) {
     const body = {
       locations: [
         { lon: start.lng, lat: start.lat },
         { lon: end.lng,   lat: end.lat   }
       ],
       costing:         'bicycle',
-      costing_options: { bicycle: this.CYCLING_COSTING },
+      costing_options: { bicycle: this._buildCyclingCosting(useRoadsWeight) },
       alternates:      2
     };
 
@@ -101,8 +105,8 @@ const Routing = {
     const data = await res.json();
     if (!data.trip) throw new Error('No routes found between these locations.');
 
-    const alternateTrips = (data.alternates || []).map(a => a.trip);
-    const trips = [data.trip, ...alternateTrips];
+    const alternateTrips = (data.alternates || []).map(a => a.trip).filter(Boolean);
+    const trips = this._sortTripsByReverseEdgeReuse([data.trip, ...alternateTrips]);
 
     return trips.map((trip, i) => ({
       id:       i + 1,
@@ -115,7 +119,7 @@ const Routing = {
 
   /* ── Roundtrip ───────────────────────────────────── */
 
-  async _roundtripRoutes(start, targetDistanceKm) {
+  async _roundtripRoutes(start, targetDistanceKm, useRoadsWeight) {
     // Radius for a circle with circumference ≈ targetDistance.
     // Roads wind more than straight-line distance; a factor of 1.3
     // empirically keeps the actual road distance close to the target.
@@ -129,7 +133,7 @@ const Routing = {
 
     for (let i = 0; i < bearingOffsets.length; i++) {
       try {
-        const route = await this._singleRoundtrip(start, R, bearingOffsets[i]);
+        const route = await this._singleRoundtrip(start, R, bearingOffsets[i], useRoadsWeight);
         if (route) {
           routes.push({ id: i + 1, name: `Route ${i + 1}`, ...route });
         }
@@ -144,7 +148,7 @@ const Routing = {
     return routes;
   },
 
-  async _singleRoundtrip(start, radiusMetres, bearingOffset) {
+  async _singleRoundtrip(start, radiusMetres, bearingOffset, useRoadsWeight) {
     // Two intermediate waypoints form an equilateral-triangle loop
     const wp1 = this._offset(start, radiusMetres, bearingOffset);
     const wp2 = this._offset(start, radiusMetres, bearingOffset + 120);
@@ -152,7 +156,8 @@ const Routing = {
     const body = {
       locations: [start, wp1, wp2, start].map(p => ({ lon: p.lng, lat: p.lat })),
       costing:         'bicycle',
-      costing_options: { bicycle: this.CYCLING_COSTING }
+      costing_options: { bicycle: this._buildCyclingCosting(useRoadsWeight) },
+      alternates:      2
     };
 
     const res  = await fetch(`${this.VALHALLA}/route`, {
@@ -165,12 +170,42 @@ const Routing = {
     if (!res.ok) return null;
     const data = await res.json();
     if (!data.trip) return null;
+    const alternateTrips = (data.alternates || []).map(a => a.trip).filter(Boolean);
+    const bestTrip = this._sortTripsByReverseEdgeReuse([data.trip, ...alternateTrips])[0];
 
     return {
-      geometry: this._tripToGeoJSON(data.trip),
-      distance: data.trip.summary.length,
-      duration: data.trip.summary.time / 60
+      geometry: this._tripToGeoJSON(bestTrip),
+      distance: bestTrip.summary.length,
+      duration: bestTrip.summary.time / 60
     };
+  },
+
+  _sortTripsByReverseEdgeReuse(trips) {
+    return trips
+      .map((trip, index) => ({ trip, index, score: this._reverseEdgeReuseScore(trip) }))
+      .sort((a, b) => a.score - b.score || a.index - b.index)
+      .map(entry => entry.trip);
+  },
+
+  _reverseEdgeReuseScore(trip) {
+    const coords = this._tripToGeoJSON(trip).coordinates;
+    if (coords.length < 2) return 0;
+
+    const norm = ([lon, lat]) => `${Math.round(lon * 1e5)},${Math.round(lat * 1e5)}`;
+    const seenDirectedEdges = new Set();
+    let reverseReuseCount = 0;
+
+    for (let i = 1; i < coords.length; i++) {
+      const from = norm(coords[i - 1]);
+      const to = norm(coords[i]);
+      if (from === to) continue;
+      const edge = `${from}>${to}`;
+      const reverseEdge = `${to}>${from}`;
+      if (seenDirectedEdges.has(reverseEdge)) reverseReuseCount++;
+      seenDirectedEdges.add(edge);
+    }
+
+    return reverseReuseCount;
   },
 
   /**
