@@ -71,7 +71,17 @@
           <span class="overlay-dot" style="background:#2d6a4f"></span>
           Hiking Routes
         </label>
+        <label class="overlay-item">
+          <input type="checkbox" id="routing-public-streets" checked />
+          <span class="overlay-dot" style="background:#6c757d"></span>
+          Public Streets (for planning)
+        </label>
       </div>
+      <p class="planning-note">
+        Route planning uses the checked route types above: each checked cycling network increases routing
+        preference for cycling-friendly ways, while Public Streets allows regular roads as fallback
+        connections (uncheck it to keep road usage as low as possible).
+      </p>
     </section>
 
     <!-- Route planning -->
@@ -124,6 +134,11 @@
           <option value="0.05">High (prefer cycling ways)</option>
         </select>
       </div>
+      <p class="planning-note">
+        Cycling Way Importance sets the base weighting, then the checked route types refine it (National,
+        Mountain Bike, Hiking, and Public Streets): higher importance plus checked cycling networks means
+        stronger cycling-way preference, with roads included only when Public Streets is enabled.
+      </p>
 
       <button id="find-routes-btn" class="btn-primary">
         <span>🔍</span> Find Routes
