@@ -167,7 +167,8 @@ const App = {
     try {
       const distance = parseInt(document.getElementById('distance-slider').value, 10);
       const cyclingWeight = parseFloat(document.getElementById('cycling-way-importance').value);
-      const routes = await Routing.findRoutes(this._mode, this._start, this._end, distance, cyclingWeight);
+      const routePreferences = this._getRoutePreferences();
+      const routes = await Routing.findRoutes(this._mode, this._start, this._end, distance, cyclingWeight, routePreferences);
       this._currentRoutes = routes;
       MapManager.displayRoutes(routes);
       this._renderResults(routes);
@@ -177,6 +178,15 @@ const App = {
       document.getElementById('loading').hidden = true;
       document.getElementById('find-routes-btn').disabled = false;
     }
+  },
+
+  _getRoutePreferences() {
+    return {
+      preferVeloland:      document.getElementById('overlay-veloland').checked,
+      preferMountainBike:  document.getElementById('overlay-mountainbike').checked,
+      preferHiking:        document.getElementById('overlay-wanderland').checked,
+      allowPublicStreets:  document.getElementById('routing-public-streets').checked
+    };
   },
 
   /* ── Results rendering ───────────────────────────── */

@@ -31,10 +31,33 @@ const Routing = {
     use_hills:    0.3
   },
 
-  _buildCyclingCosting(useRoads = this.DEFAULT_USE_ROADS) {
+  _buildCyclingCosting(useRoads = this.DEFAULT_USE_ROADS, routePreferences = {}) {
+    const {
+      preferVeloland = true,
+      preferMountainBike = false,
+      preferHiking = false,
+      allowPublicStreets = true
+    } = routePreferences;
+    const checkedRouteCount = [preferVeloland, preferMountainBike, preferHiking].filter(Boolean).length;
+
+    let adjustedUseRoads = Math.max(0, Math.min(1, Number.isFinite(useRoads) ? useRoads : this.DEFAULT_USE_ROADS));
+    if (checkedRouteCount > 0) {
+      adjustedUseRoads = Math.max(0, adjustedUseRoads - (0.05 * checkedRouteCount));
+    } else {
+      adjustedUseRoads = Math.min(1, adjustedUseRoads + 0.15);
+    }
+    if (!allowPublicStreets) {
+      adjustedUseRoads = Math.min(adjustedUseRoads, 0.02);
+    }
+
+    let bicycleType = 'hybrid';
+    if (preferMountainBike) bicycleType = 'mountain';
+    else if (preferHiking) bicycleType = 'cross';
+
     return {
       ...this.CYCLING_COSTING_BASE,
-      use_roads: Math.max(0, Math.min(1, Number.isFinite(useRoads) ? useRoads : this.DEFAULT_USE_ROADS))
+      bicycle_type: bicycleType,
+      use_roads: adjustedUseRoads
     };
   },
 
@@ -79,24 +102,26 @@ const Routing = {
    * @param {{lat:number,lng:number}} start
    * @param {{lat:number,lng:number}|null} end
    * @param {number} [targetDistanceKm] – used for roundtrip
+   * @param {number} [useRoads] – base road usage preference (0-1)
+   * @param {{preferVeloland?:boolean,preferMountainBike?:boolean,preferHiking?:boolean,allowPublicStreets?:boolean}} [routePreferences]
    */
-  async findRoutes(mode, start, end, targetDistanceKm = 50, useRoads = this.DEFAULT_USE_ROADS) {
+  async findRoutes(mode, start, end, targetDistanceKm = 50, useRoads = this.DEFAULT_USE_ROADS, routePreferences = {}) {
     if (mode === 'a-to-b') {
-      return this._aToBRoutes(start, end, useRoads);
+      return this._aToBRoutes(start, end, useRoads, routePreferences);
     }
-    return this._roundtripRoutes(start, targetDistanceKm, useRoads);
+    return this._roundtripRoutes(start, targetDistanceKm, useRoads, routePreferences);
   },
 
   /* ── A → B ───────────────────────────────────────── */
 
-  async _aToBRoutes(start, end, useRoads) {
+  async _aToBRoutes(start, end, useRoads, routePreferences) {
     const body = {
       locations: [
         { lon: start.lng, lat: start.lat },
         { lon: end.lng,   lat: end.lat   }
       ],
       costing:         'bicycle',
-      costing_options: { bicycle: this._buildCyclingCosting(useRoads) },
+      costing_options: { bicycle: this._buildCyclingCosting(useRoads, routePreferences) },
       alternates:      this.ALTERNATE_ROUTE_COUNT
     };
 
@@ -125,7 +150,7 @@ const Routing = {
 
   /* ── Roundtrip ───────────────────────────────────── */
 
-  async _roundtripRoutes(start, targetDistanceKm, useRoads) {
+  async _roundtripRoutes(start, targetDistanceKm, useRoads, routePreferences) {
     // Radius for a circle with circumference ≈ targetDistance.
     // Roads wind more than straight-line distance; a factor of 1.3
     // empirically keeps the actual road distance close to the target.
@@ -139,7 +164,7 @@ const Routing = {
 
     for (let i = 0; i < bearingOffsets.length; i++) {
       try {
-        const route = await this._singleRoundtrip(start, R, bearingOffsets[i], useRoads);
+        const route = await this._singleRoundtrip(start, R, bearingOffsets[i], useRoads, routePreferences);
         if (route) {
           routes.push({ id: i + 1, name: `Route ${i + 1}`, ...route });
         }
@@ -154,7 +179,7 @@ const Routing = {
     return routes;
   },
 
-  async _singleRoundtrip(start, radiusMetres, bearingOffset, useRoads) {
+  async _singleRoundtrip(start, radiusMetres, bearingOffset, useRoads, routePreferences) {
     // Two intermediate waypoints form an equilateral-triangle loop
     const wp1 = this._offset(start, radiusMetres, bearingOffset);
     const wp2 = this._offset(start, radiusMetres, bearingOffset + 120);
@@ -162,7 +187,7 @@ const Routing = {
     const body = {
       locations: [start, wp1, wp2, start].map(p => ({ lon: p.lng, lat: p.lat })),
       costing:         'bicycle',
-      costing_options: { bicycle: this._buildCyclingCosting(useRoads) },
+      costing_options: { bicycle: this._buildCyclingCosting(useRoads, routePreferences) },
       alternates:      this.ALTERNATE_ROUTE_COUNT
     };
 
